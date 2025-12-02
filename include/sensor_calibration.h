@@ -5,6 +5,13 @@
 #include <Arduino.h>
 
 // ============================================================================
+// FUNÇÕES DE LEITURA DO ADC ARDUINO
+// ============================================================================
+
+// Lê entrada analógica e converte para tensão
+float readAnalogVoltage(uint8_t pin);
+
+// ============================================================================
 // FUNÇÕES DE CONVERSÃO E CALIBRAÇÃO
 // ============================================================================
 
@@ -13,9 +20,6 @@ float convertWindSpeed(float voltage);
 
 // Converte tensão do sensor de nível para altura da água
 float convertWaterLevel(float voltage);
-
-// Converte tensão do Pt100 para temperatura
-float convertPt100(float voltage);
 
 // Converte tensão do piranômetro para radiação solar
 float convertRadiation(float voltage);

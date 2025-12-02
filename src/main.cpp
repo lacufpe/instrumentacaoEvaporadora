@@ -17,9 +17,10 @@
 // Dados dos sensores
 SensorData g_sensorData;
 
-// ADCs
-ADS1220 adc1(ADC1_CS_PIN);
-ADS1220 adc2(ADC2_CS_PIN);
+// ADCs para Pt100 (medição 3 fios)
+ADS1220 adcTT11(ADC_TT11_CS_PIN);
+ADS1220 adcTT12(ADC_TT12_CS_PIN);
+ADS1220 adcTT13(ADC_TT13_CS_PIN);
 
 // Sensor de temperatura e umidade
 SHT85 sht85(SHT85_I2C_ADDR);
@@ -30,14 +31,18 @@ Connectivity connectivity;
 // Controle de timing
 unsigned long lastSampleTime = 0;
 
+// Controle da conexão serial
+bool serialConnected = false;
+
 // ============================================================================
 // FUNÇÕES AUXILIARES
 // ============================================================================
 
 void printBanner() {
   Serial.println(F("==========================================="));
-  Serial.println(F("Sistema de Monitoramento de Tanque UR-11"));
+  Serial.println(F("Sistema de Monitoramento de Evaporação UR-11"));
   Serial.println(F("Arduino UNO R4 WiFi + MQTT"));
+  Serial.println(F("3x ADS1220 (RTD 3-wire) + ADC interno"));
   Serial.println(F("==========================================="));
   Serial.println();
 }
@@ -89,42 +94,33 @@ void printSensorData() {
 
 void readAllSensors() {
   // ========================================
-  // LEITURA DO ADC1 (Canais 0-3)
+  // LEITURA DOS SENSORES ANALÓGICOS (ADC Arduino)
   // ========================================
   
-  // Canal 0: FGT-11 - Anemômetro
-  int32_t raw = adc1.readChannel(0);
-  float volt = adc1.toVoltage(raw);
-  g_sensorData.windSpeed = convertWindSpeed(volt);
+  // FGT-11 - Anemômetro
+  float voltWind = readAnalogVoltage(ANALOG_FGT11_PIN);
+  g_sensorData.windSpeed = convertWindSpeed(voltWind);
   
-  // Canal 1: LT-11 - Nível de água
-  raw = adc1.readChannel(1);
-  volt = adc1.toVoltage(raw);
-  g_sensorData.waterLevel = convertWaterLevel(volt);
+  // LT-11 - Nível de água
+  float voltLevel = readAnalogVoltage(ANALOG_LT11_PIN);
+  g_sensorData.waterLevel = convertWaterLevel(voltLevel);
   
-  // Canal 2: TT-11 - Temperatura 1
-  raw = adc1.readChannel(2);
-  volt = adc1.toVoltage(raw);
-  g_sensorData.temp1 = convertPt100(volt);
-  
-  // Canal 3: TT-12 - Temperatura 2
-  raw = adc1.readChannel(3);
-  volt = adc1.toVoltage(raw);
-  g_sensorData.temp2 = convertPt100(volt);
+  // RT-11 - Radiação solar
+  float voltRad = readAnalogVoltage(ANALOG_RT11_PIN);
+  g_sensorData.radiation = convertRadiation(voltRad);
   
   // ========================================
-  // LEITURA DO ADC2 (Canais 0-1)
+  // LEITURA DOS Pt100 (ADS1220 com medição 3 fios)
   // ========================================
   
-  // Canal 0: TT-13 - Temperatura 3
-  raw = adc2.readChannel(0);
-  volt = adc2.toVoltage(raw);
-  g_sensorData.temp3 = convertPt100(volt);
+  // TT-11 - Temperatura profundidade 1
+  g_sensorData.temp1 = adcTT11.readTemperatureRTD();
   
-  // Canal 1: RT-11 - Radiação solar
-  raw = adc2.readChannel(1);
-  volt = adc2.toVoltage(raw);
-  g_sensorData.radiation = convertRadiation(volt);
+  // TT-12 - Temperatura profundidade 2
+  g_sensorData.temp2 = adcTT12.readTemperatureRTD();
+  
+  // TT-13 - Temperatura profundidade 3
+  g_sensorData.temp3 = adcTT13.readTemperatureRTD();
   
   // ========================================
   // LEITURA DO SHT85 (I2C)
@@ -145,44 +141,53 @@ void setup() {
   Serial.begin(115200);
   
   unsigned long startTime = millis();
+  // 3 segundos para aguardar conexão Serial
   while (!Serial && (millis() - startTime < 3000)) {
     delay(10);
   }
+  if (Serial) {
+    serialConnected = true;
+    printBanner();
+  }
   
-  printBanner();
   
+  // Configurar resolução do ADC interno
+  analogReadResolution(ARDUINO_ADC_RESOLUTION);
+  
+  if (serialConnected) {  
+    Serial.print(F("ADC Arduino configurado: "));
+    Serial.print(ARDUINO_ADC_RESOLUTION);
+    Serial.println(F(" bits"));
+  } 
+
   // Inicializar SPI
   SPI.begin();
   SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
-  Serial.println(F("SPI inicializado"));
+  if(serialConnected){Serial.println(F("SPI inicializado"));}
   
-  // Inicializar ADCs
-  Serial.print(F("Inicializando ADC1... "));
-  adc1.begin();
-  Serial.println(F("OK"));
-  
-  Serial.print(F("Inicializando ADC2... "));
-  adc2.begin();
-  Serial.println(F("OK"));
+  // Inicializar ADCs para Pt100 (medição 3 fios)
+  adcTT11.beginRTD3Wire();
+  adcTT12.beginRTD3Wire();
+  adcTT13.beginRTD3Wire();
   
   // Inicializar SHT85
-  Serial.print(F("Inicializando SHT85... "));
   if (sht85.begin()) {
-    Serial.println(F("OK"));
+    if(serialConnected){Serial.println(F("SHT85 - OK"));}
   } else {
-    Serial.println(F("FALHA!"));
+    if(serialConnected){Serial.println(F("SHT85 - Falha"));}
   }
   
-  Serial.println();
-  
-  // Inicializar conectividade
+  // Inicializar conectividade MQTT
   connectivity.begin();
-  
-  Serial.println();
-  Serial.println(F("Sistema inicializado!"));
-  Serial.println(F("Aquisição a 1 Hz iniciada..."));
-  Serial.println();
-  
+
+  if(serialConnected){
+    Serial.println();
+    Serial.println(F("Sistema inicializado!"));
+    Serial.print(F("Aquisição a iniciada. Tempo de amostragem: "));
+    Serial.println(SAMPLE_INTERVAL_MS);
+    Serial.println();
+  }
+
   lastSampleTime = millis();
 }
 
@@ -207,7 +212,16 @@ void loop() {
     // Enviar dados via MQTT
     connectivity.sendData(g_sensorData);
     
-    // Descomentar para ver dados formatados
-    // printSensorData();
+    // Envio dos dados via Serial e checagem da conexão serial
+    if(serialConnected){
+      printSensorData();
+      serialConnected = Serial;
+    } else {
+      if(Serial){
+        serialConnected = true;
+      } else {
+        Serial.begin(115200);
+      }
+    }
   }
 }

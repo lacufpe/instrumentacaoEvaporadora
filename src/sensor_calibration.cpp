@@ -2,6 +2,18 @@
 #include "sensor_calibration.h"
 #include "config.h"
 
+float readAnalogVoltage(uint8_t pin) {
+  // Arduino R4 tem ADC de 14 bits (0-16383)
+  analogReadResolution(ARDUINO_ADC_RESOLUTION);
+  
+  int rawValue = analogRead(pin);
+  
+  // Converter para tensão
+  float voltage = (rawValue / ARDUINO_ADC_MAX_VALUE) * ARDUINO_ADC_VREF;
+  
+  return voltage;
+}
+
 float convertWindSpeed(float voltage) {
   if (voltage < WIND_VOLTAGE_MIN) voltage = WIND_VOLTAGE_MIN;
   if (voltage > WIND_VOLTAGE_MAX) voltage = WIND_VOLTAGE_MAX;
@@ -22,18 +34,6 @@ float convertWaterLevel(float voltage) {
   float range_h = LEVEL_HEIGHT_MAX - LEVEL_HEIGHT_MIN;
   
   return LEVEL_HEIGHT_MIN + (voltage - LEVEL_VOLTAGE_MIN) * (range_h / range_v);
-}
-
-float convertPt100(float voltage) {
-  if (voltage < PT100_VOLTAGE_MIN) voltage = PT100_VOLTAGE_MIN;
-  if (voltage > PT100_VOLTAGE_MAX) voltage = PT100_VOLTAGE_MAX;
-  
-  // Conversão linear simplificada
-  // NOTA: Para maior precisão, implementar polinômio ou tabela de lookup
-  float range_v = PT100_VOLTAGE_MAX - PT100_VOLTAGE_MIN;
-  float range_t = PT100_TEMP_MAX - PT100_TEMP_MIN;
-  
-  return PT100_TEMP_MIN + (voltage - PT100_VOLTAGE_MIN) * (range_t / range_v);
 }
 
 float convertRadiation(float voltage) {

@@ -23,8 +23,17 @@
 // ============================================================================
 // CONFIGURAÇÕES DE HARDWARE - PINOS
 // ============================================================================
-#define ADC1_CS_PIN 10  // ADS1220 #1
-#define ADC2_CS_PIN 9   // ADS1220 #2
+// Pinos CS dos ADS1220 (um para cada Pt100)
+#define ADC_TT11_CS_PIN 10  // ADS1220 para TT-11
+#define ADC_TT12_CS_PIN 9   // ADS1220 para TT-12
+#define ADC_TT13_CS_PIN 8   // ADS1220 para TT-13
+
+// Pinos analógicos do Arduino R4
+#define ANALOG_FGT11_PIN A0  // Anemômetro
+#define ANALOG_LT11_PIN  A1  // Sensor de nível
+#define ANALOG_RT11_PIN  A2  // Piranômetro
+
+// Endereço I2C do SHT85
 #define SHT85_I2C_ADDR 0x44
 
 // ============================================================================
@@ -43,6 +52,13 @@
 #define ADS1220_CMD_WREG  0x40
 
 // ============================================================================
+// CONFIGURAÇÃO ADC ARDUINO
+// ============================================================================
+#define ARDUINO_ADC_RESOLUTION 14  // Arduino R4 tem ADC de 14 bits
+#define ARDUINO_ADC_VREF 5.0       // Tensão de referência (5V)
+#define ARDUINO_ADC_MAX_VALUE 16383.0  // 2^14 - 1
+
+// ============================================================================
 // CALIBRAÇÃO DOS SENSORES
 // ============================================================================
 // Anemômetro FGT-11
@@ -57,16 +73,21 @@
 #define LEVEL_HEIGHT_MIN 0.0
 #define LEVEL_HEIGHT_MAX 10.0  // metros
 
-// Pt100 (TT-11, TT-12, TT-13)
-#define PT100_VOLTAGE_MIN 0.0
-#define PT100_VOLTAGE_MAX 5.0
-#define PT100_TEMP_MIN 0.0
-#define PT100_TEMP_MAX 100.0  // °C
-
 // Piranômetro RT-11 (SN300AL)
 #define RADIATION_VOLTAGE_MIN 0.0
 #define RADIATION_VOLTAGE_MAX 5.0
 #define RADIATION_MIN 0.0
 #define RADIATION_MAX 2000.0  // W/m²
+
+// Pt100 - Parâmetros RTD
+// Pt100: R0 = 100Ω, A=3.9083×10−3°C−1 e B=−5.775×10–7°C–2 .
+// R = R0*(1 + A*T + B*T²) => T = (-A + sqrt(A² - 4*B*(1 - R/R0)))/(2*B)
+// T = k1 - sqrt(k2 + k3*R)
+#define PT100_K1 1.1285216249999998e-09
+#define PT100_K2 13181768.62502577
+#define PT100_k3 -17316.017316017318
+
+// Configuração de corrente de excitação do ADS1220 para RTD
+#define PT100_IDAC_CURRENT 0.0015  // A (ajustar conforme necessário)
 
 #endif // CONFIG_H
